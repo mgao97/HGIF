@@ -3,7 +3,7 @@ import numpy as np
 import random
 import torch
 import dgl
-from logger import Logger
+# from logger import Logger
 from parse import parser_add_main_args
 from model import Model
 import os
@@ -115,11 +115,13 @@ def get_dataset(dataset, sub_dataset=None):
 
 
 
+
+
 tr_sub, te_subs = [0], list(range(1, 5))
 dataset_tr = get_dataset(dataset=args.dataset, sub_dataset=tr_sub[0])
 datasets_te = [get_dataset(dataset=args.dataset, sub_dataset=te_subs[i]) for i in range(len(te_subs))]
 
-logger = Logger(args.runs, args)
+# logger = Logger(args.runs, args)
 print('dataset:', args.dataset)
 
 

@@ -10,7 +10,7 @@ from torch.nn import init
 import sympy
 b_xent = nn.BCEWithLogitsLoss()
 
-
+device = torch.device("cuda:" + str(0)) if torch.cuda.is_available() else torch.device("cpu")
 
 class PolyConv(nn.Module):
     def __init__(self,
@@ -129,8 +129,8 @@ def ContrastiveLoss(z_i, z_j, batch_size, negatives_loss,temperature, negatives_
     sim_ji = torch.diag(similarity_matrix, -batch_size)  # bs
     positives = torch.cat([sim_ij, sim_ji], dim=0)  # 2*bs
 
-    nominator = torch.exp(positives / temperature)  # 2*bs
-    denominator = negatives_mask * torch.exp(similarity_matrix / temperature)  # 2*bs, 2*bs
+    nominator = torch.exp(positives / temperature).to(device)  # 2*bs
+    denominator = negatives_mask * torch.exp(similarity_matrix / temperature).to(device)  # 2*bs, 2*bs
 
     loss_partial = -torch.log(nominator / (negatives_loss+torch.sum(denominator, dim=1)))  # 2*bs
     loss = torch.sum(loss_partial) / (2 * batch_size)
@@ -146,7 +146,7 @@ def Negatives_Loss(z_i, z_j, batch_size, temperature):
     sim_ji = torch.diag(similarity_matrix, -batch_size)  # bs
     negatives = torch.cat([sim_ij, sim_ji], dim=0)  # 2*bs
 
-    nominator = torch.exp(negatives / temperature)
+    nominator = torch.exp(negatives / temperature).to(device)
 
     return nominator
 

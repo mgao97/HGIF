@@ -90,6 +90,6 @@ class Model(nn.Module):
 
 
     def sup_loss(self, y, pred, weight):
-        loss = F.cross_entropy(pred, y, weight=torch.tensor([1., weight]))
+        loss = F.cross_entropy(pred.to(self.device), y.to(self.device), weight=torch.tensor([1., weight]).to(self.device))
         return loss
 
