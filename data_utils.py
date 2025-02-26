@@ -216,13 +216,21 @@ def Graph_Editer1(x, edge_index):
 import torch
 from torch.utils.data import Dataset
 
+import os
+import torch
+import dgl
+import pandas as pd
+from torch.utils.data import Dataset
+import torch.utils.data as data_utils
+
 class BotDataset(Dataset):
-    def __init__(self, name, text_data, profile_data, social_data, label_data):
+    def __init__(self, name, text_data, profile_data, social_data, label_data, edge_data=None):
         self.name = name
         self.text_data = text_data
         self.profile_data = profile_data
         self.social_data = social_data
         self.label_data = label_data
+        self.edge_data = edge_data  # 新增边数据
 
         if self.name == "train":
             self.start = 0
@@ -239,96 +247,86 @@ class BotDataset(Dataset):
     def __len__(self):
         return self.len
 
-    def __getitem__(self, idx):
-        # 获取对应索引的用户数据
-        pass
-
-
-import dgl
-
-def build_graph(args, text_data, profile_data, social_data, label_data):
-    # 模拟社交数据中的边
-    # 假设社交数据中有两部分，分别对应 follow 和 friend 的边
-    # 这里需要根据实际数据情况调整
-    follow_edges = social_data['follow_edges']
-    friend_edges = social_data['friend_edges']
-
-    # 构建异质图
-    graph_data = {
-        ('user', 'follow', 'user'): (follow_edges[0], follow_edges[1]),
-        ('user', 'friend', 'user'): (friend_edges[0], friend_edges[1])
-    }
-    g = dgl.heterograph(graph_data)
-
-    # 添加节点特征
-    g.nodes['user'].data['text'] = text_data  # 文本特征
-    g.nodes['user'].data['profile'] = profile_data  # 用户资料特征
-
-    # 添加节点标签
-    g.nodes['user'].data['label'] = label_data
-
-    return g
-
-
-def save_graph(g, save_path):
-    # 确保路径存在
-    if not os.path.exists(os.path.dirname(save_path)):
-        os.makedirs(os.path.dirname(save_path))
-
-    dgl.save_graphs(save_path, g)
-
-
-def generate_dataset(args, dataset_name):
+def process_and_save_graph(args, dataset_name, path):
     # 加载数据
     text_data = torch.load(args.path + 'tweets_tensor.pt')
     profile_data = torch.load(args.path + 'des_tensor.pt')
     social_data = torch.load(args.path + 'graph_feats1.pt')
     label_data = torch.tensor(torch.load(args.path + 'labels.pt', weights_only=False)).long()
+
+    # 假设 edge.csv 文件的格式为：source, target, relation
+    edge_file = path + 'edge.csv'
+    edges_df = pd.read_csv(edge_file)
+
+    # 过滤数据，选择 relation 为 'follow' 和 'friend'
+    filtered_edges_df = edges_df[edges_df['relation'].isin(['follow', 'friend'])]
 
     # 构建训练、验证、测试集
-    train_dataset = BotDataset("train", text_data, profile_data, social_data, label_data)
-    valid_dataset = BotDataset("valid", text_data, profile_data, social_data, label_data)
-    test_dataset = BotDataset("test", text_data, profile_data, social_data, label_data)
+    dataset_dict = {
+        "train": (0, 8278),
+        "valid": (8278, 10643),
+        "test": (10643, 11826)
+    }
 
-    # 构建训练集图
-    train_g = build_graph(args, text_data[train_dataset.start:train_dataset.end], 
-                         profile_data[train_dataset.start:train_dataset.end], 
-                         social_data[train_dataset.start:train_dataset.end], 
-                         label_data[train_dataset.start:train_dataset.end])
-    save_graph(train_g, f'{args.path}/{dataset_name}_train_graph.bin')
+    for name in ["train", "valid", "test"]:
+        start, end = dataset_dict[name]
+        
+        # 获取子集数据
+        subset_text_data = text_data[start:end]
+        subset_profile_data = profile_data[start:end]
+        subset_social_data = social_data[start:end]
+        subset_label_data = label_data[start:end]
 
-    # 构建验证集图
-    valid_g = build_graph(args, text_data[valid_dataset.start:valid_dataset.end], 
-                         profile_data[valid_dataset.start:valid_dataset.end], 
-                         social_data[valid_dataset.start:valid_dataset.end], 
-                         label_data[valid_dataset.start:valid_dataset.end])
-    save_graph(valid_g, f'{args.path}/{dataset_name}_valid_graph.bin')
+        # 拼接节点特征
+        x = torch.cat([subset_text_data, subset_profile_data, subset_social_data], dim=1)
+        
+        # 过滤边数据（根据节点索引）
+        # 假设 'source' 和 'target' 是节点的索引号
+        # 需要将全局索引转换为子集索引
+        # 如果节点索引是连续的且不重叠，可以直接过滤
+        # 否则需要先建立全局到子集的映射
+        # 这里假设节点索引是全局的，需要筛选出子集中的节点
+        # 例如：subset_indices = set(range(start, end))
+        # 但是，edge.csv 中的节点索引可能不是连续的，因此需要更复杂的处理
+        # 这里假设 edges_df 中的 'source' 和 'target' 是全局节点索引
+        # 并且子集的节点索引范围是 [start, end)
+        # 因此，筛选出 source 和 target 在子集范围内的边
+        subset_edges_df = filtered_edges_df[
+            (filtered_edges_df['source'] >= start) &
+            (filtered_edges_df['source'] < end) &
+            (filtered_edges_df['target'] >= start) &
+            (filtered_edges_df['target'] < end)
+        ]
 
-    # 构建测试集图
-    test_g = build_graph(args, text_data[test_dataset.start:test_dataset.end], 
-                         profile_data[test_dataset.start:test_dataset.end], 
-                         social_data[test_dataset.start:test_dataset.end], 
-                         label_data[test_dataset.start:test_dataset.end])
-    save_graph(test_g, f'{args.path}/{dataset_name}_test_graph.bin')
+        # 转换为 DGL 的边索引格式
+        # 调整节点索引为子集内的相对索引
+        # 例如：source 和 target 都是全局索引，需要减去 start 得到子集内的索引
+        subset_edges_df['source'] = subset_edges_df['source'] - start
+        subset_edges_df['target'] = subset_edges_df['target'] - start
 
+        # 分离边类型
+        follow_edges_df = subset_edges_df[subset_edges_df['relation'] == 'follow']
+        friend_edges_df = subset_edges_df[subset_edges_df['relation'] == 'friend']
 
-import torch
-import dgl
-import os
+        # 构建图数据
+        graph_data = {
+            ('user', 'follow', 'user'): (follow_edges_df['source'].values, follow_edges_df['target'].values),
+            ('user', 'friend', 'user'): (friend_edges_df['source'].values, friend_edges_df['target'].values)
+        }
 
-def process_and_save_graph(args, dataset_name):
-    # 加载数据
-    text_data = torch.load(args.path + 'tweets_tensor.pt')
-    profile_data = torch.load(args.path + 'des_tensor.pt')
-    social_data = torch.load(args.path + 'graph_feats1.pt')
-    label_data = torch.tensor(torch.load(args.path + 'labels.pt', weights_only=False)).long()
+        # 构建 DGL 图
+        g = dgl.heterograph(graph_data, num_nodes=x.size(0))
 
-    # 构建图
-    g = build_graph(args, text_data, profile_data, social_data, label_data)
+        # 添加节点特征和标签
+        g.nodes['user'].data['feature'] = x
+        g.nodes['user'].data['label'] = subset_label_data
 
-    # 保存图
-    save_path = f'{args.path}/{dataset_name}_graph.bin'
-    save_graph(g, save_path)
+        # 保存图
+        save_path = f"{args.path}{dataset_name}_{name}_graph.bin"
+        dgl.save_graphs(save_path, g)
+
+        print(f"Saved {name} graph to {save_path}")
+
 
 
 import argparse
@@ -340,7 +338,3 @@ args = parser.parse_args()
 
 process_and_save_graph(args, "twibot-20")
 
-
-
-# 调用示例
-generate_dataset(args, "twibot-20")
