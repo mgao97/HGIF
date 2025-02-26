@@ -210,3 +210,130 @@ def Graph_Editer1(x, edge_index):
     aug = Aug.Compose([Aug.EdgeRemoving(pe=rate), Aug.FeatureMasking(pf=rate)])
     x_aug, edge_index_aug,edge_weight_aug = aug(x, edge_index)
     return x_aug, edge_index_aug
+
+
+###############################
+import torch
+from torch.utils.data import Dataset
+
+class BotDataset(Dataset):
+    def __init__(self, name, text_data, profile_data, social_data, label_data):
+        self.name = name
+        self.text_data = text_data
+        self.profile_data = profile_data
+        self.social_data = social_data
+        self.label_data = label_data
+
+        if self.name == "train":
+            self.start = 0
+            self.end = 8278
+        elif self.name == "valid":
+            self.start = 8278
+            self.end = 10643
+        elif self.name == "test":
+            self.start = 10643
+            self.end = 11826
+        
+        self.len = self.end - self.start
+
+    def __len__(self):
+        return self.len
+
+    def __getitem__(self, idx):
+        # 获取对应索引的用户数据
+        pass
+
+
+import dgl
+
+def build_graph(args, text_data, profile_data, social_data, label_data):
+    # 模拟社交数据中的边
+    # 假设社交数据中有两部分，分别对应 follow 和 friend 的边
+    # 这里需要根据实际数据情况调整
+    follow_edges = social_data['follow_edges']
+    friend_edges = social_data['friend_edges']
+
+    # 构建异质图
+    graph_data = {
+        ('user', 'follow', 'user'): (follow_edges[0], follow_edges[1]),
+        ('user', 'friend', 'user'): (friend_edges[0], friend_edges[1])
+    }
+    g = dgl.heterograph(graph_data)
+
+    # 添加节点特征
+    g.nodes['user'].data['text'] = text_data  # 文本特征
+    g.nodes['user'].data['profile'] = profile_data  # 用户资料特征
+
+    # 添加节点标签
+    g.nodes['user'].data['label'] = label_data
+
+    return g
+
+
+def save_graph(g, save_path):
+    # 确保路径存在
+    if not os.path.exists(os.path.dirname(save_path)):
+        os.makedirs(os.path.dirname(save_path))
+
+    dgl.save_graphs(save_path, g)
+
+
+def generate_dataset(args, dataset_name):
+    # 加载数据
+    text_data = torch.load(args.path + 'tweets_tensor.pt')
+    profile_data = torch.load(args.path + 'des_tensor.pt')
+    social_data = torch.load(args.path + 'graph_feats1.pt')
+    label_data = torch.tensor(torch.load(args.path + 'labels.pt', weights_only=False)).long()
+
+    # 构建训练、验证、测试集
+    train_dataset = BotDataset("train", text_data, profile_data, social_data, label_data)
+    valid_dataset = BotDataset("valid", text_data, profile_data, social_data, label_data)
+    test_dataset = BotDataset("test", text_data, profile_data, social_data, label_data)
+
+    # 构建训练集图
+    train_g = build_graph(args, text_data[train_dataset.start:train_dataset.end], 
+                         profile_data[train_dataset.start:train_dataset.end], 
+                         social_data[train_dataset.start:train_dataset.end], 
+                         label_data[train_dataset.start:train_dataset.end])
+    save_graph(train_g, f'{args.path}/{dataset_name}_train_graph.bin')
+
+    # 构建验证集图
+    valid_g = build_graph(args, text_data[valid_dataset.start:valid_dataset.end], 
+                         profile_data[valid_dataset.start:valid_dataset.end], 
+                         social_data[valid_dataset.start:valid_dataset.end], 
+                         label_data[valid_dataset.start:valid_dataset.end])
+    save_graph(valid_g, f'{args.path}/{dataset_name}_valid_graph.bin')
+
+    # 构建测试集图
+    test_g = build_graph(args, text_data[test_dataset.start:test_dataset.end], 
+                         profile_data[test_dataset.start:test_dataset.end], 
+                         social_data[test_dataset.start:test_dataset.end], 
+                         label_data[test_dataset.start:test_dataset.end])
+    save_graph(test_g, f'{args.path}/{dataset_name}_test_graph.bin')
+
+# 调用示例
+generate_dataset(args, "twibot-20")
+
+import torch
+import dgl
+import os
+
+def process_and_save_graph(args, dataset_name):
+    # 加载数据
+    text_data = torch.load(args.path + 'tweets_tensor.pt')
+    profile_data = torch.load(args.path + 'des_tensor.pt')
+    social_data = torch.load(args.path + 'graph_feats1.pt')
+    label_data = torch.tensor(torch.load(args.path + 'labels.pt', weights_only=False)).long()
+
+    # 构建图
+    g = build_graph(args, text_data, profile_data, social_data, label_data)
+
+    # 保存图
+    save_path = f'{args.path}/{dataset_name}_graph.bin'
+    save_graph(g, save_path)
+
+# 调用示例
+args = {
+    "path": "path/to/your/data/",
+}
+process_and_save_graph(args, "twibot-20")
