@@ -311,8 +311,6 @@ def generate_dataset(args, dataset_name):
                          label_data[test_dataset.start:test_dataset.end])
     save_graph(test_g, f'{args.path}/{dataset_name}_test_graph.bin')
 
-# 调用示例
-generate_dataset(args, "twibot-20")
 
 import torch
 import dgl
@@ -332,8 +330,17 @@ def process_and_save_graph(args, dataset_name):
     save_path = f'{args.path}/{dataset_name}_graph.bin'
     save_graph(g, save_path)
 
-# 调用示例
-args = {
-    "path": "path/to/your/data/",
-}
+
+import argparse
+parser = argparse.ArgumentParser(description='General Training Pipeline')
+parser.add_argument("--path", type=str, default="../data/twibot-20/", help="dataset path")
+
+args = parser.parse_args()
+
+
 process_and_save_graph(args, "twibot-20")
+
+
+
+# 调用示例
+generate_dataset(args, "twibot-20")
