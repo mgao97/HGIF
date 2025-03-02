@@ -7,7 +7,7 @@ import dgl
 from parse import parser_add_main_args
 from model import Model
 import os
-from data_utils import *
+from data_utils_new import *
 from sklearn.model_selection import train_test_split
 
 from create_synthetic import *
@@ -101,6 +101,7 @@ fix_seed(0)
 ### Parse args ###
 parser = argparse.ArgumentParser(description='General Training Pipeline')
 parser_add_main_args(parser)
+
 args = parser.parse_args()
 print(args)
 

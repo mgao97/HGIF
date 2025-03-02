@@ -126,13 +126,47 @@ def gen_dataset(name):
     elif name == 'amazon':
         dataset = FraudAmazonDataset()
         graph = dataset[0]
+        print('graph:',graph)
         graph = dgl.to_homogeneous(graph, ndata=['feature', 'label', 'train_mask', 'val_mask', 'test_mask'])
     elif name == 'tfinance':
         dataset, label_dict = load_graphs('../data/tfinance/tfinance1')
         graph = dataset[0]
         graph.ndata['label'] = dataset[0].ndata['label'].argmax(1)
         graph.ndata['feature'] = graph.ndata['feature'].float()
+    elif name == 'twibot-20':
+        dataset = dgl.load_graphs('../data/twibot-20/twibot-20_graph.bin')
+        
+        # print('dataset:',dataset)
+        graph = dataset[0][0]
+        print('graph:',graph)
+        
+        print(type(graph))
+        graph = dgl.to_homogeneous(graph)
+        
+        train_mask = np.zeros(229580, dtype=np.bool_)
+        val_mask = np.zeros(229580, dtype=np.bool_)
+        test_mask = np.zeros(229580, dtype=np.bool_)
+        # 定义索引范围
+        train_idx = np.arange(0, 8278)
+        val_idx = np.arange(8278, 10643)
+        test_idx = np.arange(10643, 11826)
 
+        # 设置掩码
+        train_mask[train_idx] = True
+        val_mask[val_idx] = True
+        test_mask[test_idx] = True
+        graph.ndata["train_mask"] = torch.tensor(train_mask)
+        graph.ndata["val_mask"] = torch.tensor(val_mask)
+        graph.ndata["test_mask"] = torch.tensor(test_mask)
+        
+        text_data = torch.load('../data/twibot-20/tweets_tensor.pt')
+        profile_data = torch.load('../data/twibot-20/des_tensor.pt')
+        social_data = torch.load('../data/twibot-20/graph_feats2.pt')
+        label_data = torch.tensor(torch.load('../data/twibot-20/labels.pt', weights_only=False)).long()
+        
+        graph.ndata["feature"] = torch.cat([text_data, profile_data, social_data[:229580]], dim=1)
+        graph.ndata["label"] = label_data[:229580]
+        
     elif name == 'tsocial':
         dataset, label_dict = load_graphs('../data/tsocial/tsocial1')
         graph = dataset[0]
@@ -151,6 +185,9 @@ def gen_dataset(name):
     elif name == 'amazon':
         my_list = list(range(11944))
         num = 20
+    elif name == 'twibot-20':
+        my_list = list(range(229580))
+        num = 5
     elif name == 'tfinance':
         my_list = list(range(39357))
         num = 5
@@ -197,4 +234,5 @@ def gen_dataset(name):
 
 if __name__ == '__main__':
     # gen_dataset(name='tfinance' )
-    gen_dataset(name='amazon')
+    # gen_dataset(name='amazon')
+    gen_dataset(name='twibot-20')

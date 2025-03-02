@@ -4,7 +4,8 @@
 def parser_add_main_args(parser):
     # dataset and protocol
     parser.add_argument('--data_dir', type=str, default='../data') # need to be specified
-    parser.add_argument('--dataset', type=str, default='amazon')
+    # parser.add_argument('--dataset', type=str, default='amazon')
+    parser.add_argument('--dataset', type=str, default='twibot-20')
     parser.add_argument('--save_dir', type=str, default='./pytorch_models/') # need to be specified
     parser.add_argument('--device', type=int, default=0,
                         help='which gpu to use if any (default: 0)')

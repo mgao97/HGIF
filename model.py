@@ -1,7 +1,7 @@
 import torch
 
 from nets import *
-from data_utils import *
+from data_utils_new import *
 from torch.nn import Sequential
 
 
@@ -23,6 +23,11 @@ class Model(nn.Module):
 
     def forward(self, data,batch_nodes,weight):
         y =  data.ndata['label'].to(self.device)
+        # print(torch.unique(y))
+        
+        
+        
+        
         Loss, Log_p = [], 0
         embedding_list=[]
         for k in range(len(self.g_list)):
@@ -31,7 +36,21 @@ class Model(nn.Module):
             embedding=torch.cat((embedding_lf,embedding_hf),dim=1)
 
             out = self.linear(embedding)
-            loss = self.sup_loss(y[batch_nodes], out[batch_nodes],weight)
+            # mask = (y == 0) | (y == 1)
+            # mask = mask.to(out.device)
+            
+            # # 检查设备信息
+            # print("out device:", out.device)
+            # print("mask device:", mask.device)
+            
+            # y = y[mask]
+            # out = out[mask]
+            
+            # print(y[batch_nodes].shape, out[batch_nodes].shape)
+            
+            
+            
+            loss = self.sup_loss(y[batch_nodes], out[batch_nodes])
             Loss.append(loss.view(-1))
             embedding_list.append((embedding_lf,embedding_hf))
         Loss = torch.cat(Loss, dim=0)
@@ -89,7 +108,11 @@ class Model(nn.Module):
         return contrast_loss
 
 
-    def sup_loss(self, y, pred, weight):
-        loss = F.cross_entropy(pred.to(self.device), y.to(self.device), weight=torch.tensor([1., weight]).to(self.device))
+    def sup_loss(self, y, pred):
+        mask = (y == 0) | (y == 1)
+        mask = mask.to('cpu')
+        y = y[mask]
+        pred = pred[mask]
+        loss = F.cross_entropy(pred.to(self.device), y.to(self.device))
         return loss
 
